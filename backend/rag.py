@@ -15,6 +15,8 @@ class SimpleRAG:
     def __init__(self):
         self.documents: List[Document] = []
         self.embeddings: List[List[float]] = []
+        self.current_media = None
+        self.media_mime = None
         self.api_key = os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             print("WARNING: GEMINI_API_KEY is not set.")
@@ -97,6 +99,15 @@ class SimpleRAG:
             
         return len(chunks)
 
+    def set_media(self, file_path: str, mime_type: str):
+        """Convert media to base64 for Gemini Vision/Video."""
+        import base64
+        with open(file_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode('utf-8')
+        self.current_media = encoded
+        self.media_mime = mime_type
+        print(f"DEBUG: Media set. Type: {mime_type}, Size: {len(encoded)} chars")
+
     def query(self, question: str, history: list = []) -> str:
         """Retrieve relevant docs and answer question with emojis and personality. 🤖✨"""
         import time
@@ -177,6 +188,15 @@ Current Question: {question}
                 "parts": [{"text": prompt}]
             }]
         }
+
+        # 5. INJECT MEDIA (VISION/VIDEO)
+        if self.current_media and self.media_mime:
+            data["contents"][0]["parts"].insert(0, {
+                "inline_data": {
+                    "mime_type": self.media_mime,
+                    "data": self.current_media
+                }
+            })
 
         last_error = ""
         # 4. GENTLE PAUSE (Reduce RPM Pressure)
@@ -268,3 +288,5 @@ Current Question: {question}
     def clear_database(self):
         self.documents = []
         self.embeddings = []
+        self.current_media = None
+        self.media_mime = None

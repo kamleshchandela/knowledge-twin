@@ -40,7 +40,10 @@ const Chat = () => {
             const fileMsg = {
                 role: 'user',
                 type: 'file',
-                content: file.name
+                content: file.name,
+                isMedia: res.data.is_media,
+                mime: res.data.mime,
+                preview: res.data.is_media ? URL.createObjectURL(file) : null
             };
 
             // 2. Add summary from the assistant (Left)
@@ -133,13 +136,26 @@ const Chat = () => {
                                     prose-strong:text-inherit
                                 `}>
                                     {msg.type === 'file' ? (
-                                        <div className="flex items-center gap-3 py-1">
-                                            <div className="bg-white/20 p-2 rounded-xl">
-                                                <FileText size={24} className="text-white" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-white font-bold text-sm tracking-tight">DOCUMENT UPLOADED</span>
-                                                <span className="text-blue-100 text-xs opacity-90 truncate max-w-[150px]">{msg.content}</span>
+                                        <div className="flex flex-col gap-3 py-1">
+                                            {msg.isMedia && msg.preview && (
+                                                <div className="rounded-xl overflow-hidden shadow-lg bg-black/10">
+                                                    {msg.mime.startsWith('image/') ? (
+                                                        <img src={msg.preview} alt="Upload" className="max-w-full h-auto object-contain" />
+                                                    ) : (
+                                                        <video src={msg.preview} controls className="max-w-full h-auto" />
+                                                    )}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-white/20 p-2 rounded-xl">
+                                                    <FileText size={24} className="text-white" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-white font-bold text-sm tracking-tight">
+                                                        {msg.isMedia ? (msg.mime.startsWith('image/') ? 'PHOTO' : 'VIDEO') : 'DOCUMENT'} UPLOADED
+                                                    </span>
+                                                    <span className="text-blue-100 text-xs opacity-90 truncate max-w-[150px]">{msg.content}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     ) : (
@@ -183,7 +199,7 @@ const Chat = () => {
                     `}>
                         <input
                             type="file"
-                            accept=".pdf,.txt"
+                            accept=".pdf,.txt,image/*,video/*"
                             className="hidden"
                             onChange={handleUpload}
                             disabled={uploading}

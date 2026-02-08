@@ -43,14 +43,33 @@ async def upload_file(file: UploadFile = File(...)):
         with open(file_location, "wb+") as file_object:
             shutil.copyfileobj(file.file, file_object)
         
-        # Ingest file
+        mime_type = file.content_type
+        print(f"DEBUG: File uploaded: {file.filename}, Type: {mime_type}")
+
+        # Separate Flow for Media (Image/Video)
+        if mime_type.startswith('image/') or mime_type.startswith('video/'):
+            rag_system.clear_database()
+            rag_system.set_media(file_location, mime_type)
+            os.remove(file_location)
+            
+            # Simple placeholder summary for media
+            file_type = "image" if "image" in mime_type else "video"
+            return {
+                "message": f"Successfully processed {file.filename}",
+                "chunks": 0,
+                "summary": f"✨ **{file_type.upper()} LOADED!** I can now see this {file_type}. Ask me anything about it! 📸🎥",
+                "is_media": True,
+                "mime": mime_type
+            }
+
+        # Ingest Document (PDF/Text)
         num_chunks = rag_system.ingest_file(file_location)
         
         # Cleanup
         os.remove(file_location)
         
         if num_chunks == 0:
-            raise HTTPException(status_code=400, detail="Could not extract text from this file. It might be an image-based PDF. Please upload a text PDF.")
+            raise HTTPException(status_code=400, detail="Could not extract text from this file. It might be an image-based PDF. Please upload a multmedia file or a text PDF.")
         
         # Generate Summary
         summary = rag_system.summarize_document()
@@ -58,7 +77,8 @@ async def upload_file(file: UploadFile = File(...)):
         return {
             "message": f"Successfully processed {file.filename}", 
             "chunks": num_chunks,
-            "summary": summary
+            "summary": summary,
+            "is_media": False
         }
     except HTTPException as he:
         raise he
