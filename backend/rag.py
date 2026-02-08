@@ -24,27 +24,33 @@ class SimpleRAG:
             print(f"DEBUG: Loaded API Key ending in ...{self.api_key[-5:]}")
 
     def _get_embedding(self, text: str) -> List[float]:
-        """Get embedding from Gemini API."""
+        """Get embedding with 429 retry logic."""
+        import time
         if not self.api_key:
-            return [0.0] * 768  # Gemini embedding-001 is 768 dims
+            return [0.0] * 768
             
+        # Verified working URL for basic embeddings
         url = f"https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
             "model": "models/embedding-001",
-            "content": {
-                "parts": [{"text": text}]
-            }
+            "content": {"parts": [{"text": text}]}
         }
         
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()
-            result = response.json()
-            return result['embedding']['values']
-        except Exception as e:
-            print(f"Error getting embedding: {e}")
-            return [0.0] * 768
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=data)
+                if response.status_code == 429:
+                    print(f"DEBUG: Embedding limit hit. Waiting 10s (Attempt {attempt+1})...")
+                    time.sleep(10)
+                    continue
+                response.raise_for_status()
+                result = response.json()
+                return result['embedding']['values']
+            except Exception as e:
+                print(f"Error getting embedding: {e}")
+                time.sleep(2)
+        return [0.0] * 768
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """Calculate cosine similarity between two vectors."""
@@ -116,12 +122,14 @@ class SimpleRAG:
         if not self.api_key:
             return "GEMINI_API_KEY not found. 🔑"
 
-        # Verified Working Models for this Key
+        # Verified Working Models from Discovery Script
         models_to_try = [
             "gemini-2.0-flash",
-            "gemini-flash-latest",
             "gemini-2.0-flash-lite",
-            "gemini-pro-latest"
+            "gemini-flash-latest",
+            "gemini-pro-latest",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro"
         ]
         headers = {"Content-Type": "application/json"}
         
@@ -202,36 +210,45 @@ Current Question: {question}
         # 4. GENTLE PAUSE (Reduce RPM Pressure)
         time.sleep(1)
         
-        for model_name in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
-            print(f"DEBUG: Trying model {model_name}...")
-            
-            try:
-                response = requests.post(url, headers=headers, json=data)
+        # DOUBLE-PASS RETRY LOGIC (The "Infinite Patience" System)
+        for attempt in range(2): 
+            for model_name in models_to_try:
+                # Use v1beta as it is confirmed to have the best model support for this key
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
                 
-                if response.status_code == 429:
-                    print(f"WARNING: Rate limit (429) hit for {model_name}. Waiting 10s...")
-                    last_error = f"Rate limit reached on {model_name}. ⏱️"
-                    time.sleep(10)
-                    continue
+                print(f"DEBUG: [Pass {attempt+1}] Trying {model_name}...")
+                
+                try:
+                    response = requests.post(url, headers=headers, json=data, timeout=30)
                     
-                if response.status_code != 200:
-                    error_text = response.text
-                    print(f"WARNING: Model {model_name} failed with status {response.status_code}: {error_text}")
-                    last_error = f"Status {response.status_code}: {error_text[:100]}"
-                    continue
+                    if response.status_code == 429:
+                        print(f"WARNING: 429 Rate Limit for {model_name}. Waiting 15s...")
+                        last_error = f"Limit reached on {model_name}. ⏱️"
+                        time.sleep(15)
+                        continue
+                        
+                    if response.status_code == 404:
+                        print(f"DEBUG: Model {model_name} not available (404). Skipping...")
+                        continue
 
-                result = response.json()
-                if 'candidates' in result and result['candidates']:
-                    return result['candidates'][0]['content']['parts'][0]['text']
-                else:
-                    print(f"WARNING: No candidates in response for {model_name}: {result}")
-                    last_error = "Empty response from API"
-            except Exception as e:
-                print(f"CRITICAL: Model {model_name} search failed: {e}")
-                last_error = str(e)
+                    if response.status_code != 200:
+                        print(f"WARNING: Model {model_name} failed ({response.status_code})")
+                        last_error = f"API Status {response.status_code}"
+                        continue
+
+                    result = response.json()
+                    if 'candidates' in result and result['candidates']:
+                        return result['candidates'][0]['content']['parts'][0]['text']
+                    
+                except Exception as e:
+                    print(f"CRITICAL: System error on {model_name}: {e}")
+                    last_error = "Server Connectivity Issue"
+            
+            if attempt == 0:
+                print("RECOVERY: All brain modules busy. Resting for 20s before Full Pass 2...")
+                time.sleep(20) 
         
-        return f"Error: All my brain modules are busy! 🤯 Please try again in a moment. (Details: {last_error})"
+        return f"Error: All my brain modules are busy! 🤯 Google's Free Tier is extremely busy. Please try again in 1 minute. (Details: {last_error})"
 
     def summarize_document(self) -> str:
         """Simple and direct summary."""
