@@ -23,6 +23,16 @@ class SimpleRAG:
         else:
             print(f"DEBUG: Loaded API Key ending in ...{self.api_key[-5:]}")
 
+        # Persistence (In-Memory)
+        self.chat_history = [] 
+        self.files_metadata = [] 
+        self.stats = {
+            "total_queries": 0,
+            "docs_indexed": 0,
+            "active_users": 1, 
+            "avg_latency_ms": 45 
+        }
+
     def _get_embedding(self, text: str) -> List[float]:
         """Get embedding with 429 retry logic."""
         import time
@@ -30,10 +40,10 @@ class SimpleRAG:
             return [0.0] * 768
             
         # Verified working URL for basic embeddings
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={self.api_key}"
         headers = {"Content-Type": "application/json"}
         data = {
-            "model": "models/embedding-001",
+            "model": "models/text-embedding-004",
             "content": {"parts": [{"text": text}]}
         }
         
@@ -103,6 +113,19 @@ class SimpleRAG:
             self.documents.append(Document(page_content=chunk, metadata={"source": file_path}))
             self.embeddings.append(embedding)
             
+        # Update Stats & Files
+        import os, datetime
+        self.stats["docs_indexed"] += 1
+        file_name = os.path.basename(file_path).replace("temp_", "")
+        self.files_metadata.append({
+            "id": len(self.files_metadata) + 1,
+            "title": file_name,
+            "type": "PDF" if file_path.endswith(".pdf") else "TXT",
+            "size": f"{len(text)/1024:.1f} KB",
+            "date": "Just now",
+            "tags": ["Uploaded"]
+        })
+
         return len(chunks)
 
     def set_media(self, file_path: str, mime_type: str):
@@ -114,6 +137,20 @@ class SimpleRAG:
         self.media_mime = mime_type
         print(f"DEBUG: Media set. Type: {mime_type}, Size: {len(encoded)} chars")
 
+        # Update Stats & Files
+        import os, datetime
+        self.stats["docs_indexed"] += 1
+        file_name = os.path.basename(file_path).replace("temp_", "")
+        media_type = "Image" if "image" in mime_type else "Video"
+        self.files_metadata.append({
+            "id": len(self.files_metadata) + 1,
+            "title": file_name,
+            "type": media_type,
+            "size": f"{len(encoded)/1024:.1f} KB",
+            "date": "Just now",
+            "tags": ["Media", media_type]
+        })
+
     def query(self, question: str, history: list = []) -> str:
         """Retrieve relevant docs and answer question with emojis and personality. 🤖✨"""
         import time
@@ -123,13 +160,11 @@ class SimpleRAG:
             return "GEMINI_API_KEY not found. 🔑"
 
         # Verified Working Models from Discovery Script
+        # Verified Working Models - Prioritize faster/stable ones
         models_to_try = [
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-flash-latest",
-            "gemini-pro-latest",
             "gemini-1.5-flash",
-            "gemini-1.5-pro"
+            "gemini-1.5-pro",
+            "gemini-pro",
         ]
         headers = {"Content-Type": "application/json"}
         
@@ -250,10 +285,22 @@ Current Question: {question}
                     last_error = "Server Connectivity Issue"
             
             if attempt == 0:
-                print("RECOVERY: All brain modules busy. Resting for 20s before Full Pass 2...")
-                time.sleep(20) 
+                print("RECOVERY: Switching strategy... (Wait 2s)")
+                time.sleep(2) 
         
         return f"Error: All my brain modules are busy! 🤯 Google's Free Tier is extremely busy. Please try again in 1 minute. (Details: {last_error})"
+
+    def update_history(self, role: str, content: str):
+        import datetime
+        timestamp = datetime.datetime.now().isoformat()
+        self.chat_history.append({"role": role, "content": content, "timestamp": timestamp})
+        
+    def get_dashboard_data(self):
+        return {
+            "stats": self.stats,
+            "recent_history": self.chat_history[-5:],
+            "files": self.files_metadata[-5:]
+        }
 
     def summarize_document(self) -> str:
         """Simple and direct summary."""

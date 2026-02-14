@@ -8,3 +8,4 @@ langchain-openai
 pypdf
 python-dotenv
 tiktoken
+requests

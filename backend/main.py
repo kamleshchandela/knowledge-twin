@@ -88,13 +88,33 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/query")
 async def query_knowledge(request: QueryRequest):
     try:
+        # Log User Query
+        rag_system.update_history("user", request.question)
+        rag_system.stats["total_queries"] += 1
+        
         answer = rag_system.query(request.question, request.history)
+        
+        # Log AI Response
+        rag_system.update_history("model", answer)
+        
         return {"answer": answer}
     except Exception as e:
         print(f"Error querying: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/dashboard")
+async def get_dashboard_data():
+    return rag_system.get_dashboard_data()
+
+@app.get("/files")
+async def get_files():
+    return rag_system.files_metadata
+
 @app.delete("/clear")
 async def clear_database():
     rag_system.clear_database()
     return {"message": "Database cleared"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
