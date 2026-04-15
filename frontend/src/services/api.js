@@ -12,7 +12,10 @@ const api = axios.create({
 export const sendMessage = async (question, history = []) => {
     try {
         const response = await api.post('/query', { question, history });
-        return response.data.answer;
+        return {
+            answer: response.data.answer,
+            latency_ms: response.data.latency_ms ?? null,
+        };
     } catch (error) {
         console.error("API Error (Chat):", error);
         throw error;

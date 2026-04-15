@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import shutil
 import os
+import time
 from rag import SimpleRAG
 from dotenv import load_dotenv
 
@@ -88,6 +89,7 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/query")
 async def query_knowledge(request: QueryRequest):
     try:
+        start_time = time.perf_counter()
         # Log User Query
         rag_system.update_history("user", request.question)
         rag_system.stats["total_queries"] += 1
@@ -96,8 +98,10 @@ async def query_knowledge(request: QueryRequest):
         
         # Log AI Response
         rag_system.update_history("model", answer)
-        
-        return {"answer": answer}
+        latency_ms = int((time.perf_counter() - start_time) * 1000)
+        rag_system.stats["avg_latency_ms"] = latency_ms
+
+        return {"answer": answer, "latency_ms": latency_ms}
     except Exception as e:
         print(f"Error querying: {e}")
         raise HTTPException(status_code=500, detail=str(e))

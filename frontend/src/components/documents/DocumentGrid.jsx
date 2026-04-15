@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FileText, File, MoreVertical, Search, Plus, Filter, Grid, List } from 'lucide-react';
+import { FileText, MoreVertical, Search, Plus } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 import GlowButton from '../ui/GlowButton';
 import Badge from '../ui/Badge';
@@ -17,7 +17,7 @@ const DocumentGrid = ({ files = [] }) => {
             try {
                 await uploadFile(e.target.files[0]);
                 alert("File uploaded successfully! (Refresh to see changes when backend is fully connected)");
-            } catch (error) {
+            } catch {
                 alert("Upload failed. Check console for details.");
             } finally {
                 setIsUploading(false);

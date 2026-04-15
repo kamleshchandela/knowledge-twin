@@ -2,6 +2,7 @@ import os
 import math
 import json
 import requests
+import time
 from typing import List, Dict, Any
 from pypdf import PdfReader
 
@@ -32,10 +33,67 @@ class SimpleRAG:
             "active_users": 1, 
             "avg_latency_ms": 45 
         }
+        self._cached_models: List[str] = []
+        self._model_cache_ts = 0.0
+        self._model_cache_ttl_seconds = 600
+
+    def _discover_generate_models(self) -> List[str]:
+        """Discover text-generation models available to the current API key."""
+        if not self.api_key:
+            return []
+        if self._cached_models and (time.time() - self._model_cache_ts) < self._model_cache_ttl_seconds:
+            return self._cached_models
+
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={self.api_key}"
+            response = requests.get(url, timeout=20)
+            response.raise_for_status()
+            models = response.json().get("models", [])
+
+            discovered = []
+            for model in models:
+                methods = model.get("supportedGenerationMethods", [])
+                name = model.get("name", "")
+                if "generateContent" in methods and name.startswith("models/"):
+                    discovered.append(name.split("/", 1)[1])
+
+            # Prefer stable general-purpose Gemini models over previews/specialized models.
+            blocked_keywords = (
+                "preview",
+                "tts",
+                "image",
+                "robotics",
+                "computer-use",
+                "deep-research",
+                "lyria",
+                "nano-banana",
+                "gemma",
+            )
+            stable = [m for m in discovered if not any(k in m for k in blocked_keywords)]
+            self._cached_models = stable if stable else discovered
+            self._model_cache_ts = time.time()
+            return self._cached_models
+        except Exception as e:
+            print(f"WARNING: Could not discover models: {e}")
+            return self._cached_models
+
+    def _models_to_try(self, preferred: List[str]) -> List[str]:
+        """Merge preferred models with discovered models for resilient fallback."""
+        available = self._discover_generate_models()
+        if not available:
+            return preferred
+
+        ordered = []
+        for model in preferred:
+            if model in available and model not in ordered:
+                ordered.append(model)
+        for model in available:
+            if model not in ordered:
+                ordered.append(model)
+        return ordered
 
     def _get_embedding(self, text: str) -> List[float]:
         """Get embedding with 429 retry logic."""
-        import time
         if not self.api_key:
             return [0.0] * 768
             
@@ -150,89 +208,80 @@ class SimpleRAG:
             "date": "Just now",
             "tags": ["Media", media_type]
         })
-
     def query(self, question: str, history: list = []) -> str:
-        """Retrieve relevant docs and answer question with emojis and personality. 🤖✨"""
-        import time
-        
-        # 1. GENERATOR SETUP
+        """Retrieve relevant docs and answer question with low-latency failover."""
         if not self.api_key:
-            return "GEMINI_API_KEY not found. 🔑"
+            return "GEMINI_API_KEY not found."
 
-        # Verified Working Models from Discovery Script
-        # Verified Working Models - Prioritize faster/stable ones
-        models_to_try = [
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-pro",
-        ]
+        models_to_try = self._models_to_try([
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-2.5-pro",
+            "gemini-pro-latest",
+        ])
         headers = {"Content-Type": "application/json"}
-        
-        # 2. CONTEXT RETRIEVAL
+        question_lower = question.strip().lower()
+        fast_greetings = {
+            "hi", "hello", "hey", "yo", "hola", "sup", "hii", "heyy",
+            "good morning", "good afternoon", "good evening",
+        }
+        is_fast_greeting = question_lower in fast_greetings
+
         context = ""
-        if self.documents:
+        if self.documents and not is_fast_greeting:
             q_embedding = self._get_embedding(question)
             scores = []
             for i, doc_embedding in enumerate(self.embeddings):
                 score = self._cosine_similarity(q_embedding, doc_embedding)
                 scores.append((score, i))
-                
             scores.sort(key=lambda x: x[0], reverse=True)
-            
-            # Threshold (0.15) for ignoring document for greetings/unrelated chat
             best_score = scores[0][0] if scores else 0
             if best_score > 0.15:
                 top_k_indices = [idx for _, idx in scores[:3]]
                 context = "\n\n".join([self.documents[idx].page_content for idx in top_k_indices])
 
-        # 3. CHAT HISTORY PROCESSING (Last 10 messages)
         history_str = ""
         if history:
-            clean_history = history[-10:] # Keep it short and relevant
+            clean_history = history[-6:]
             for msg in clean_history:
-                role = "User" if msg.get('role') == 'user' else "Twin"
-                content = msg.get('content', '')
-                if msg.get('type') == 'file': content = f"[Uploaded File: {content}]"
+                role = "User" if msg.get("role") == "user" else "Twin"
+                content = msg.get("content", "")[:500]
+                if msg.get("type") == "file":
+                    content = f"[Uploaded File: {content}]"
                 history_str += f"{role}: {content}\n"
 
-        # 4. PROMPT ENGINEERING (STATEFUL & WORLD-CLASS)
-        history_block = f"\n**Recent Conversation History:**\n{history_str}\n" if history_str else ""
-        
-        if context:
-            prompt = f"""You are a World-Class Knowledge Expert, similar to ChatGPT. 🧠✨
-Answer this question with PRECISE DEPTH using the Context below. 🔍
+        history_block = f"\nRecent Conversation History:\n{history_str}\n" if history_str else ""
 
-Context:
-{context}
-{history_block}
-Current Question: {question}
-
-**Instructions:**
-1. **World-Class Quality:** Provide a thorough, deep, and structured explanation. 📖
-2. **Zero Filler:** Every sentence must add value. Eliminate all fluff. 🎯
-3. **Context Focus:** Build your answer directly from the document provided. 📄
-4. **Natural Follow-up:** End with one relevant follow-up question.
-5. **Tone:** Professional, intelligent, and friendly with relevant emojis. 👋✨
-
-Answer:"""
+        if is_fast_greeting:
+            prompt = f"Reply to this greeting naturally in one short sentence: {question}"
+        elif context:
+            prompt = (
+                "You are a world-class knowledge expert.\n"
+                "Answer using the supplied context with clear and precise detail.\n\n"
+                f"Context:\n{context}\n"
+                f"{history_block}"
+                f"Current Question: {question}\n"
+            )
         else:
-            prompt = f"""You are a World-Class Knowledge Expert, similar to ChatGPT. 🧠✨
-{history_block}
-Current Question: {question}
-
-**Instructions:**
-1. Provide a high-quality, detailed, and precise answer. 🎯
-2. Eliminate all useless filler. ⏱️
-3. End with a natural suggestion for the next logical question. 😊
-4. Use emojis tastefully. ✨"""
+            prompt = (
+                "You are a world-class knowledge expert.\n"
+                "Provide a concise and useful answer.\n"
+                f"{history_block}"
+                f"Current Question: {question}\n"
+            )
 
         data = {
             "contents": [{
                 "parts": [{"text": prompt}]
-            }]
+            }],
+            "generationConfig": {
+                "temperature": 0.4 if is_fast_greeting else 0.7,
+                "maxOutputTokens": 64 if is_fast_greeting else 512,
+            },
         }
 
-        # 5. INJECT MEDIA (VISION/VIDEO)
         if self.current_media and self.media_mime:
             data["contents"][0]["parts"].insert(0, {
                 "inline_data": {
@@ -242,54 +291,44 @@ Current Question: {question}
             })
 
         last_error = ""
-        # 4. GENTLE PAUSE (Reduce RPM Pressure)
-        time.sleep(1)
-        
-        # DOUBLE-PASS RETRY LOGIC (The "Infinite Patience" System)
-        for attempt in range(2): 
-            for model_name in models_to_try:
-                # Use v1beta as it is confirmed to have the best model support for this key
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
-                
-                print(f"DEBUG: [Pass {attempt+1}] Trying {model_name}...")
-                
-                try:
-                    response = requests.post(url, headers=headers, json=data, timeout=30)
-                    
-                    if response.status_code == 429:
-                        print(f"WARNING: 429 Rate Limit for {model_name}. Waiting 15s...")
-                        last_error = f"Limit reached on {model_name}. ⏱️"
-                        time.sleep(15)
-                        continue
-                        
-                    if response.status_code == 404:
-                        print(f"DEBUG: Model {model_name} not available (404). Skipping...")
-                        continue
+        for model_name in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
+            print(f"DEBUG: Trying {model_name}...")
+            try:
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=data,
+                    timeout=12 if is_fast_greeting else 20,
+                )
 
-                    if response.status_code == 403:
-                        print(f"CRITICAL: 403 Forbidden for {model_name}. Your API Key or Project is likely SUSPENDED or RESTRICTED.")
-                        last_error = "API Key Suspended/Forbidden (403). Please check Google AI Studio."
-                        continue
-                        
-                    if response.status_code != 200:
-                        print(f"WARNING: Model {model_name} failed ({response.status_code})")
-                        last_error = f"API Status {response.status_code}: {response.text[:100]}"
-                        continue
+                if response.status_code == 429:
+                    print(f"WARNING: 429 Rate Limit for {model_name}. Trying next model...")
+                    last_error = f"Limit reached on {model_name} (429)."
+                    continue
+                if response.status_code == 404:
+                    print(f"DEBUG: Model {model_name} not available (404). Skipping...")
+                    last_error = f"Model unavailable: {model_name} (404)."
+                    continue
+                if response.status_code == 403:
+                    last_error = "API Key forbidden (403)."
+                    continue
+                if response.status_code != 200:
+                    last_error = f"API Status {response.status_code}: {response.text[:100]}"
+                    continue
 
-                    result = response.json()
-                    if 'candidates' in result and result['candidates']:
-                        return result['candidates'][0]['content']['parts'][0]['text']
-                    
-                except Exception as e:
-                    print(f"CRITICAL: System error on {model_name}: {e}")
-                    last_error = "Server Connectivity Issue"
-            
-            if attempt == 0:
-                print("RECOVERY: Switching strategy... (Wait 2s)")
-                time.sleep(2) 
-        
-        return f"Error: All my brain modules are busy! 🤯 Google's Free Tier is extremely busy. Please try again in 1 minute. (Details: {last_error})"
+                result = response.json()
+                candidates = result.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts and "text" in parts[0]:
+                        return parts[0]["text"]
+                last_error = f"No text candidates returned by {model_name}."
+            except Exception as e:
+                print(f"CRITICAL: System error on {model_name}: {e}")
+                last_error = "Server connectivity issue."
 
+        return f"Error: model response unavailable right now. Details: {last_error}"
     def update_history(self, role: str, content: str):
         import datetime
         timestamp = datetime.datetime.now().isoformat()
@@ -314,13 +353,13 @@ Current Question: {question}
 
 {context}"""
 
-        # Verified Working Models
-        models_to_try = [
+        models_to_try = self._models_to_try([
+            "gemini-2.5-flash",
             "gemini-2.0-flash",
             "gemini-flash-latest",
             "gemini-2.0-flash-lite",
-            "gemini-pro-latest"
-        ]
+            "gemini-pro-latest",
+        ])
         
         headers = {"Content-Type": "application/json"}
         last_error = ""
@@ -359,3 +398,5 @@ Current Question: {question}
         self.embeddings = []
         self.current_media = None
         self.media_mime = None
+
+

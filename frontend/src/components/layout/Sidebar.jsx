@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import {
     MessageSquare,
     FileText,
@@ -10,7 +10,6 @@ import {
     Upload,
     ChevronLeft,
     ChevronRight,
-    Zap
 } from 'lucide-react';
 import clsx from 'clsx';
 import GlassCard from '../ui/GlassCard';

@@ -11,7 +11,7 @@ The following diagram illustrates the high-level flow of the Knowledge Twin syst
 ```mermaid
 graph TD
     User([User]) <--> Frontend[React Frontend - Vite]
-    Frontend <--> Backend[FastAPI Backend - Port 8003]
+    Frontend <--> Backend[FastAPI Backend - Port 8000]
     
     subgraph "Backend Processing"
         Backend --> Context[Context Manager]
@@ -55,7 +55,7 @@ Most AIs forget as soon as you stop asking. The Knowledge Twin is different:
 ### 4. **Industrial-Grade Stability (The Shield)** 🛡️⚙️
 Built for developers and professionals who need 100% uptime:
 - **Rate-Limit Auto-Recovery**: Implements a proprietary 10-second "Deep Backoff" logic. If Google's API is busy, the Twin waits and retries automatically.
-- **Ghost-Server Isolation**: Migrated to Port **8003** to prevent browser-stealing ghost processes.
+- **Ghost-Server Isolation**: Migrated to Port **8000** to prevent browser-stealing ghost processes.
 - **Model Rotation**: A resilient fallback chain (2.0 Flash → 1.5 Pro → 1.5 Flash-8b) ensures you always get an answer.
 
 ### 5. **Security & Privacy First** 🔐📁
@@ -111,7 +111,7 @@ pip install -r requirements.txt
 # Create .env and add your key
 echo "GEMINI_API_KEY=YOUR_KEY" > .env
 # Launch with Port Isolation
-python -m uvicorn main:app --host 0.0.0.0 --port 8003
+python -m uvicorn main:app --host 0.0.0.0 --Port 8000
 ```
 
 ### **2. Frontend Activation**
@@ -126,7 +126,7 @@ npm run dev
 
 ### **3. Synchronization**
 Ensure `Chat.jsx` points to:
-`const HOST = "http://localhost:8003";`
+`const HOST = "http://localhost:8000";`
 
 ---
 
@@ -134,3 +134,4 @@ Ensure `Chat.jsx` points to:
 The Knowledge Twin is designed to be your most reliable pair-programmer and researcher. If you encounter a "Busy Modules" message, simply wait 10 seconds—our **Deep Recovery** system is busy working for you!
 
 **Optimized for Excellence. Powered by Gemini 2.0. 🚀🤖🤝💖**
+

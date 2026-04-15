@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Clock, FileText, Sparkles, Cpu } from 'lucide-react';
+import { Clock, FileText, Sparkles, Cpu } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 import Badge from '../ui/Badge';
 

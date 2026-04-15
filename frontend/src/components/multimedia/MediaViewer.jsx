@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Upload, Maximize2, FileText, Image as ImageIcon } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 import GlowButton from '../ui/GlowButton';
-import Badge from '../ui/Badge';
 
 import { uploadFile } from '../../services/api';
 
@@ -18,7 +16,7 @@ const MediaViewer = () => {
             try {
                 await uploadFile(e.target.files[0]);
                 alert("Media uploaded successfully! Summary generated in Chat.");
-            } catch (error) {
+            } catch {
                 alert("Upload failed.");
             } finally {
                 setIsUploading(false);

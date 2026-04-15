@@ -6,6 +6,7 @@ import clsx from 'clsx';
 
 const MessageBubble = ({ message }) => {
     const isAi = message.sender === 'ai';
+    const showLatency = isAi && !message.isTyping && typeof message.latencyMs === 'number';
 
     return (
         <motion.div
@@ -34,11 +35,24 @@ const MessageBubble = ({ message }) => {
                     : "bg-primary-600 border-primary-500 rounded-tr-none text-white max-w-[80%]"
             )}>
                 <div className="prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    {message.isTyping ? (
+                        <div className="flex items-center gap-1 py-1">
+                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce [animation-delay:-0.2s]" />
+                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce [animation-delay:-0.1s]" />
+                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce" />
+                        </div>
+                    ) : (
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                    )}
                 </div>
+                {showLatency && (
+                    <div className="mt-2 text-[11px] text-gray-400">
+                        Backend latency: {message.latencyMs} ms
+                    </div>
+                )}
 
                 {/* Actions (AI only) */}
-                {isAi && (
+                {isAi && !message.isTyping && (
                     <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors" title="Copy">
                             <Copy size={14} />

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
 import { sendMessage, uploadFile } from '../../services/api';
-import { motion } from 'framer-motion';
 
 const ChatWindow = () => {
     const [messages, setMessages] = useState([
@@ -36,10 +35,11 @@ const ChatWindow = () => {
             const newAiMsg = {
                 id: Date.now() + 1,
                 sender: 'ai',
-                content: response
+                content: response.answer,
+                latencyMs: response.latency_ms,
             };
             setMessages(prev => [...prev, newAiMsg]);
-        } catch (error) {
+        } catch {
             const errorMsg = {
                 id: Date.now() + 1,
                 sender: 'ai',
@@ -65,7 +65,7 @@ const ChatWindow = () => {
                 content: data.summary || `Successfully uploaded ${file.name}.`
             };
             setMessages(prev => [...prev, successMsg]);
-        } catch (error) {
+        } catch {
             const errorMsg = {
                 id: Date.now() + 1,
                 sender: 'ai',
@@ -89,6 +89,16 @@ const ChatWindow = () => {
                     {messages.map((msg) => (
                         <MessageBubble key={msg.id} message={msg} />
                     ))}
+                    {isLoading && (
+                        <MessageBubble
+                            message={{
+                                id: 'typing',
+                                sender: 'ai',
+                                content: '_Thinking..._',
+                                isTyping: true,
+                            }}
+                        />
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
             </div>

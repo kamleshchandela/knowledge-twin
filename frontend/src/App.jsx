@@ -65,6 +65,14 @@ function App() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-navy-900 text-white">
+        <Loader size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-navy-900 text-white selection:bg-primary-500/30">
       {/* Background Ambience */}

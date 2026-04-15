@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { User, Lock, Bell, Moon, Smartphone, Globe, Code, Database, Trash2 } from 'lucide-react';
+import { Lock, Moon, Code, Trash2 } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
 import GlowButton from '../ui/GlowButton';
 
@@ -50,7 +49,6 @@ const Select = ({ label, options, value, onChange }) => (
 
 const SettingsPanel = () => {
     const [darkMode, setDarkMode] = useState(true);
-    const [notifications, setNotifications] = useState(true);
     const [model, setModel] = useState('Gemini 1.5 Pro');
 
     return (

@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Activity, Database, Zap, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import GlassCard from '../ui/GlassCard';
