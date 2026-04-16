@@ -208,19 +208,38 @@ class SimpleRAG:
             "date": "Just now",
             "tags": ["Media", media_type]
         })
-    def query(self, question: str, history: list = []) -> str:
+    def query(self, question: str, history: list = [], model_profile: str = "balanced") -> str:
         """Retrieve relevant docs and answer question with low-latency failover."""
         if not self.api_key:
             return "GEMINI_API_KEY not found."
 
-        models_to_try = self._models_to_try([
-            "gemini-2.5-flash",
-            "gemini-flash-latest",
-            "gemini-2.0-flash-lite",
-            "gemini-2.0-flash",
-            "gemini-2.5-pro",
-            "gemini-pro-latest",
-        ])
+        profile_models = {
+            "fast": [
+                "gemini-2.0-flash-lite",
+                "gemini-2.0-flash",
+                "gemini-flash-latest",
+                "gemini-2.5-flash",
+                "gemini-2.5-pro",
+                "gemini-pro-latest",
+            ],
+            "quality": [
+                "gemini-2.5-pro",
+                "gemini-2.5-flash",
+                "gemini-pro-latest",
+                "gemini-2.0-flash",
+                "gemini-flash-latest",
+                "gemini-2.0-flash-lite",
+            ],
+            "balanced": [
+                "gemini-2.5-flash",
+                "gemini-flash-latest",
+                "gemini-2.0-flash",
+                "gemini-2.0-flash-lite",
+                "gemini-2.5-pro",
+                "gemini-pro-latest",
+            ],
+        }
+        models_to_try = self._models_to_try(profile_models.get(model_profile, profile_models["balanced"]))
         headers = {"Content-Type": "application/json"}
         question_lower = question.strip().lower()
         fast_greetings = {

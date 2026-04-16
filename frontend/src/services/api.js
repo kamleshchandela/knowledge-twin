@@ -9,9 +9,9 @@ const api = axios.create({
     },
 });
 
-export const sendMessage = async (question, history = []) => {
+export const sendMessage = async (question, history = [], modelProfile = 'balanced') => {
     try {
-        const response = await api.post('/query', { question, history });
+        const response = await api.post('/query', { question, history, model_profile: modelProfile });
         return {
             answer: response.data.answer,
             latency_ms: response.data.latency_ms ?? null,

@@ -32,6 +32,7 @@ rag_system = SimpleRAG()
 class QueryRequest(BaseModel):
     question: str
     history: list = []
+    model_profile: str = "balanced"
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -94,7 +95,7 @@ async def query_knowledge(request: QueryRequest):
         rag_system.update_history("user", request.question)
         rag_system.stats["total_queries"] += 1
         
-        answer = rag_system.query(request.question, request.history)
+        answer = rag_system.query(request.question, request.history, request.model_profile)
         
         # Log AI Response
         rag_system.update_history("model", answer)

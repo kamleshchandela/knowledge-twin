@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import RightPanel from './components/layout/RightPanel';
 import ChatWindow from './components/chat/ChatWindow';
@@ -8,109 +7,217 @@ import MediaViewer from './components/multimedia/MediaViewer';
 import Analytics from './components/dashboard/Analytics';
 import SettingsPanel from './components/settings/SettingsPanel';
 import MemoryView from './components/memory/MemoryView';
+import HeroLanding from './components/landing/HeroLanding';
 import Loader from './components/ui/Loader';
+import { clearMemory, fetchDashboardData } from './services/api';
+import { Menu, X } from 'lucide-react';
 
-import { fetchDashboardData } from './services/api';
+const tabs = [
+  { id: 'chat', label: 'Chat' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'multimedia', label: 'Media' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'analytics', label: 'Analytics' },
+  { id: 'settings', label: 'Settings' },
+];
 
 function App() {
+  const defaultSettings = { theme: 'light', modelProfile: 'balanced', alerts: true };
   const [activeTab, setActiveTab] = useState('chat');
-  const [isMobile, setIsMobile] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Global Data State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLanding, setShowLanding] = useState(() => {
+    try {
+      return !localStorage.getItem('kt_seen_landing_v1');
+    } catch {
+      return true;
+    }
+  });
+  const [sessionResetToken, setSessionResetToken] = useState(0);
+  const [settingsStatus, setSettingsStatus] = useState('');
+  const [settings, setSettings] = useState(() => {
+    try {
+      const raw = localStorage.getItem('kt_settings_v1');
+      return raw ? { ...defaultSettings, ...JSON.parse(raw) } : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
+  });
   const [dashboardData, setDashboardData] = useState({
-    stats: { total_queries: 0, docs_indexed: 0, active_users: 1, avg_latency_ms: 45 },
+    stats: { total_queries: 0, docs_indexed: 0, active_users: 1, avg_latency_ms: 0 },
     recent_history: [],
-    files: []
+    files: [],
   });
 
   useEffect(() => {
     const loadData = async () => {
       const data = await fetchDashboardData();
-      if (data) setDashboardData(data);
+      if (data) {
+        setDashboardData(data);
+      }
     };
 
     loadData();
-    const interval = setInterval(loadData, 5000); // Poll every 5s
-    return () => clearInterval(interval);
-  }, []);
-
-  // Handle responsiveness
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth < 1024) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
+    const interval = setInterval(loadData, 5000);
+    const loadingTimer = setTimeout(() => setIsLoading(false), 500);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(loadingTimer);
     };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    // Simulate initial load
-    setTimeout(() => setIsLoading(false), 1500);
-
-    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('kt_settings_v1', JSON.stringify(settings));
+    document.body.setAttribute('data-theme', settings.theme);
+  }, [settings]);
+
+  const pushStatus = (msg) => {
+    setSettingsStatus(msg);
+    setTimeout(() => setSettingsStatus(''), 2200);
+  };
+
+  const handleSaveSettings = () => {
+    if (settings.alerts) {
+      pushStatus('Settings saved');
+    }
+  };
+
+  const handleResetSession = async () => {
+    await clearMemory();
+    setSessionResetToken((prev) => prev + 1);
+    setDashboardData((prev) => ({
+      ...prev,
+      recent_history: [],
+      files: [],
+      stats: { ...prev.stats, total_queries: 0, docs_indexed: 0 },
+    }));
+    setActiveTab('chat');
+    if (settings.alerts) {
+      pushStatus('Session reset');
+    }
+  };
+
+  const handleEnterApp = () => {
+    setShowLanding(false);
+    setActiveTab('chat');
+    try {
+      localStorage.setItem('kt_seen_landing_v1', '1');
+    } catch {
+      // no-op
+    }
+  };
+
+  const handleGoToLanding = () => {
+    setShowLanding(true);
+    setMobileMenuOpen(false);
+  };
+
+  const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    setMobileMenuOpen(false);
+  };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'chat': return <ChatWindow />;
-      case 'documents': return <DocumentGrid files={dashboardData.files} />;
-      case 'multimedia': return <MediaViewer />;
-      case 'memory': return <MemoryView />;
-      case 'analytics': return <Analytics stats={dashboardData.stats} />;
-      case 'settings': return <SettingsPanel />;
-      default: return <ChatWindow />;
+      case 'chat':
+        return <ChatWindow modelProfile={settings.modelProfile} resetToken={sessionResetToken} />;
+      case 'documents':
+        return <DocumentGrid files={dashboardData.files} />;
+      case 'multimedia':
+        return <MediaViewer />;
+      case 'memory':
+        return <MemoryView />;
+      case 'analytics':
+        return <Analytics stats={dashboardData.stats} />;
+      case 'settings':
+        return (
+          <SettingsPanel
+            settings={settings}
+            onChangeSettings={setSettings}
+            onSaveSettings={handleSaveSettings}
+            onResetSession={handleResetSession}
+          />
+        );
+      default:
+        return <ChatWindow />;
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-navy-900 text-white">
-        <Loader size="lg" />
+      <div className="app-shell">
+        <header className="navbar">
+          <div className="navbar-brand">Knowledge Twin</div>
+        </header>
+        <main className="main-content">
+          <div className="glass-card" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+            <Loader size="lg" />
+          </div>
+        </main>
       </div>
     );
   }
 
+  if (showLanding) {
+    return <HeroLanding onEnter={handleEnterApp} />;
+  }
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-navy-900 text-white selection:bg-primary-500/30">
-      {/* Background Ambience */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/20 rounded-full blur-[120px] mix-blend-screen animate-pulse-slow" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent-500/20 rounded-full blur-[120px] mix-blend-screen animate-pulse-slow" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-[20%] right-[20%] w-[20%] h-[20%] bg-blue-500/10 rounded-full blur-[100px] mix-blend-screen" />
-      </div>
+    <div className="app-shell">
+      <header className="navbar">
+        <button type="button" className="navbar-brand" onClick={handleGoToLanding}>
+          Knowledge Twin
+        </button>
+        <button
+          type="button"
+          className="hamburger-btn"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          aria-label="Toggle mobile menu"
+          aria-expanded={mobileMenuOpen}
+        >
+          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+        <nav className="nav-links">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`nav-link ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => handleTabClick(tab.id)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+          {tabs.map((tab) => (
+            <button
+              key={`mobile-${tab.id}`}
+              className={`mobile-menu-link ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => handleTabClick(tab.id)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <div className="system-status">
+          <span className="status-dot" />
+          System Online {settingsStatus ? `• ${settingsStatus}` : ''}
+        </div>
+      </header>
 
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isMobile={isMobile}
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-      />
-
-      <motion.main
-        layout
-        className={`flex-1 relative z-10 transition-all duration-300 flex flex-col h-full overflow-hidden ${isSidebarOpen && !isMobile ? 'ml-[280px]' : isSidebarOpen && !isMobile === false && !isMobile ? 'ml-[80px]' : ''}`}
-      >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex-1 h-full overflow-hidden"
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
-      </motion.main>
-
-      {!isMobile && <RightPanel data={dashboardData} />}
+      <main className="main-content">
+        <div className="terminal-grid">
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <section className="content-wrap">
+            <div className="glass-card scroll-area">{renderContent()}</div>
+          </section>
+          <RightPanel data={dashboardData} />
+        </div>
+      </main>
     </div>
   );
-};
+}
 
 export default App;

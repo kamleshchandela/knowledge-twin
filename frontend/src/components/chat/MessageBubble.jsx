@@ -1,77 +1,27 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { User, Bot, Copy, ThumbsUp, ThumbsDown, RefreshCw } from 'lucide-react';
-import clsx from 'clsx';
 
 const MessageBubble = ({ message }) => {
-    const isAi = message.sender === 'ai';
-    const showLatency = isAi && !message.isTyping && typeof message.latencyMs === 'number';
+  const isAi = message.sender === 'ai';
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={clsx(
-                "flex gap-4 max-w-4xl mx-auto w-full mb-6",
-                isAi ? "flex-row" : "flex-row-reverse"
-            )}
-        >
-            {/* Avatar */}
-            <div className={clsx(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-lg",
-                isAi
-                    ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white"
-                    : "bg-white/10 text-gray-300"
-            )}>
-                {isAi ? <Bot size={18} /> : <User size={18} />}
-            </div>
-
-            {/* Bubble */}
-            <div className={clsx(
-                "group relative p-4 rounded-xl shadow-lg border backdrop-blur-sm",
-                isAi
-                    ? "bg-white/5 border-white/10 rounded-tl-none text-gray-200"
-                    : "bg-primary-600 border-primary-500 rounded-tr-none text-white max-w-[80%]"
-            )}>
-                <div className="prose prose-invert prose-sm max-w-none">
-                    {message.isTyping ? (
-                        <div className="flex items-center gap-1 py-1">
-                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce [animation-delay:-0.2s]" />
-                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce [animation-delay:-0.1s]" />
-                            <span className="w-2 h-2 rounded-full bg-gray-300/80 animate-bounce" />
-                        </div>
-                    ) : (
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                    )}
-                </div>
-                {showLatency && (
-                    <div className="mt-2 text-[11px] text-gray-400">
-                        Backend latency: {message.latencyMs} ms
-                    </div>
-                )}
-
-                {/* Actions (AI only) */}
-                {isAi && !message.isTyping && (
-                    <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <button className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors" title="Copy">
-                            <Copy size={14} />
-                        </button>
-                        <button className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors" title="Regenerate">
-                            <RefreshCw size={14} />
-                        </button>
-                        <div className="h-3 w-px bg-white/10 mx-1" />
-                        <button className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
-                            <ThumbsUp size={14} />
-                        </button>
-                        <button className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
-                            <ThumbsDown size={14} />
-                        </button>
-                    </div>
-                )}
-            </div>
-        </motion.div>
-    );
+  return (
+    <div className={`message-row ${isAi ? 'ai' : 'user'}`}>
+      <div className={`message-bubble ${isAi ? 'ai' : 'user'}`}>
+        {message.isTyping ? (
+          <div className="typing-dots">
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : (
+          <ReactMarkdown>{message.content || ''}</ReactMarkdown>
+        )}
+        {typeof message.latencyMs === 'number' && !message.isTyping && (
+          <div className="latency-tag">Backend latency: {message.latencyMs} ms</div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default MessageBubble;
