@@ -11,7 +11,8 @@ The following diagram illustrates the high-level flow of the Knowledge Twin syst
 ```mermaid
 graph TD
     User([User]) <--> Frontend[React Frontend - Vite]
-    Frontend <--> Backend[FastAPI Backend - Port 8000]
+    Frontend <--> Backend[Node.js / Express Backend - Port 8000]
+    Backend <--> Mongo[(MongoDB Atlas)]
     
     subgraph "Backend Processing"
         Backend --> Context[Context Manager]
@@ -78,19 +79,23 @@ The Knowledge Twin features a **Premium Glassmorphism Design System**:
 
 ```text
 KnowledgeTwin/
-├── backend/                # Python FastAPI Intelligence
-│   ├── main.py             # API Routing & Payload Handling
-│   ├── rag.py              # The Core RAG & Multimedia Logic
-│   ├── requirements.txt    # Python Dependencies
-│   └── .env                # API Key Storage (Private)
-├── frontend/               # React (Vite) User Experience
+├── backend/                 # Node.js / Express Intelligence
+│   ├── src/
+│   │   ├── server.js        # App entry, CORS, Mongo connect
+│   │   ├── config/db.js     # MongoDB (Mongoose) connection
+│   │   ├── models/          # Chunk, Media, FileMeta, ChatMessage, Stats
+│   │   ├── services/        # geminiService.js, ragService.js
+│   │   └── routes/          # upload, query, dashboard, files, clear
+│   ├── package.json         # Node Dependencies
+│   └── .env                 # API Key & Mongo URI Storage (Private)
+├── frontend/                # React (Vite) User Experience
 │   ├── src/
 │   │   ├── components/
-│   │   │   └── Chat.jsx    # Glassmorphic Chat Interface
-│   │   └── App.jsx         # Application Root
-│   └── tailwind.config.js  # Premium Styling Config
-├── .gitignore              # Global Security Mask
-└── README.md               # Extensive Documentation
+│   │   │   └── Chat.jsx     # Glassmorphic Chat Interface
+│   │   └── App.jsx          # Application Root
+│   └── tailwind.config.js   # Premium Styling Config
+├── .gitignore                # Global Security Mask
+└── README.md                 # Extensive Documentation
 ```
 
 ---
@@ -98,8 +103,8 @@ KnowledgeTwin/
 ## 🛠️ Installation & Setup
 
 ### **Prerequisites**
-- Python 3.10+
 - Node.js 18+
+- A MongoDB connection (e.g. a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster)
 - [Google Gemini API Key](https://aistudio.google.com/)
 
 ### **1. Backend Activation**
@@ -107,11 +112,11 @@ KnowledgeTwin/
 # Navigate to backend
 cd backend
 # Install dependencies
-pip install -r requirements.txt
-# Create .env and add your key
-echo "GEMINI_API_KEY=YOUR_KEY" > .env
-# Launch with Port Isolation
-python -m uvicorn main:app --host 0.0.0.0 --Port 8000
+npm install
+# Create .env from the example and fill in your key + Mongo URI
+copy .env.example .env
+# Launch on port 8000
+npm run dev
 ```
 
 ### **2. Frontend Activation**
