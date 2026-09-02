@@ -1,100 +1,108 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
 import { sendMessage, uploadFile } from '../../services/api';
-import { motion } from 'framer-motion';
 
-const ChatWindow = () => {
-    const [messages, setMessages] = useState([
-        { id: 1, sender: 'ai', content: "# Hello! \nI'm your **Knowledge Twin**. I can help you analyze documents, generate insights, or just chat. How can I assist you today?" }
+const ChatWindow = ({ modelProfile = 'balanced', resetToken = 0 }) => {
+  const [messages, setMessages] = useState([
+    {
+      id: 1,
+      sender: 'ai',
+      content: 'Clinical tactical console ready. Upload a document or ask a question.',
+    },
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    setMessages([
+      {
+        id: Date.now(),
+        sender: 'ai',
+        content: 'Session reset complete. Clinical tactical console ready.',
+      },
     ]);
-    const messagesEndRef = useRef(null);
+  }, [resetToken]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
+  const handleSend = async (text) => {
+    const newUserMsg = { id: Date.now(), sender: 'user', content: text };
+    setMessages((prev) => [...prev, newUserMsg]);
+    setIsLoading(true);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    try {
+      const history = messages.map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        content: m.content,
+      }));
+      const response = await sendMessage(text, history, modelProfile);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: 'ai',
+          content: response.answer,
+          latencyMs: response.latency_ms,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: 'ai',
+          content: 'Error: backend unreachable on port 8000.',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const [isLoading, setIsLoading] = useState(false);
+  const handleUpload = async (file) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now(), sender: 'user', content: `Uploading ${file.name}...` },
+    ]);
+    setIsLoading(true);
+    try {
+      const data = await uploadFile(file);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          sender: 'ai',
+          content: data.summary || `File uploaded: ${file.name}`,
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now() + 1, sender: 'ai', content: 'Upload failed. Please retry.' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const handleSend = async (text) => {
-        const newUserMsg = { id: Date.now(), sender: 'user', content: text };
-        setMessages(prev => [...prev, newUserMsg]);
-        setIsLoading(true);
-
-        try {
-            // Prepare history for context
-            const history = messages.map(m => ({
-                role: m.sender === 'user' ? 'user' : 'model',
-                content: m.content
-            }));
-            const response = await sendMessage(text, history);
-
-            const newAiMsg = {
-                id: Date.now() + 1,
-                sender: 'ai',
-                content: response
-            };
-            setMessages(prev => [...prev, newAiMsg]);
-        } catch (error) {
-            const errorMsg = {
-                id: Date.now() + 1,
-                sender: 'ai',
-                content: "⚠️ **Error:** I couldn't reach the backend. Is it running on port 8000?"
-            };
-            setMessages(prev => [...prev, errorMsg]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleUpload = async (file) => {
-        const tempMsg = { id: Date.now(), sender: 'user', content: `📁 Uploading **${file.name}**...` };
-        setMessages(prev => [...prev, tempMsg]);
-        setIsLoading(true);
-
-        try {
-            const data = await uploadFile(file);
-
-            const successMsg = {
-                id: Date.now() + 1,
-                sender: 'ai',
-                content: data.summary || `Successfully uploaded ${file.name}.`
-            };
-            setMessages(prev => [...prev, successMsg]);
-        } catch (error) {
-            const errorMsg = {
-                id: Date.now() + 1,
-                sender: 'ai',
-                content: "⚠️ **Upload Failed:** Could not process the file."
-            };
-            setMessages(prev => [...prev, errorMsg]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="flex flex-col h-full w-full relative">
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pb-2">
-                <div className="max-w-4xl mx-auto space-y-2">
-                    {messages.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center opacity-50">
-                            <p>Start a conversation...</p>
-                        </div>
-                    )}
-                    {messages.map((msg) => (
-                        <MessageBubble key={msg.id} message={msg} />
-                    ))}
-                    <div ref={messagesEndRef} />
-                </div>
-            </div>
-            <InputBar onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
-        </div>
-    );
+  return (
+    <div className="chat-layout">
+      <div className="label-mono" style={{ marginBottom: 10 }}>
+        Chat Terminal
+      </div>
+      <div className="message-stack">
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+        {isLoading && <MessageBubble message={{ id: 'typing', sender: 'ai', isTyping: true }} />}
+        <div ref={messagesEndRef} />
+      </div>
+      <InputBar onSend={handleSend} onUpload={handleUpload} isLoading={isLoading} />
+    </div>
+  );
 };
 
 export default ChatWindow;

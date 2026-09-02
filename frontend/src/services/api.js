@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -9,10 +9,13 @@ const api = axios.create({
     },
 });
 
-export const sendMessage = async (question, history = []) => {
+export const sendMessage = async (question, history = [], modelProfile = 'balanced') => {
     try {
-        const response = await api.post('/query', { question, history });
-        return response.data.answer;
+        const response = await api.post('/query', { question, history, model_profile: modelProfile });
+        return {
+            answer: response.data.answer,
+            latency_ms: response.data.latency_ms ?? null,
+        };
     } catch (error) {
         console.error("API Error (Chat):", error);
         throw error;

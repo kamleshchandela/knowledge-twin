@@ -1,18 +1,25 @@
 import React from 'react';
 
 const Loader = ({ size = 'md' }) => {
-    const sizes = {
-        sm: 'w-4 h-4',
-        md: 'w-8 h-8',
-        lg: 'w-12 h-12',
-    };
-
-    return (
-        <div className={`relative ${sizes[size]}`}>
-            <div className="absolute inset-0 border-2 border-primary-500/30 rounded-full" />
-            <div className="absolute inset-0 border-2 border-primary-500 rounded-full border-t-transparent animate-spin" />
-        </div>
-    );
+  const sizeMap = {
+    sm: 20,
+    md: 32,
+    lg: 48,
+  };
+  const px = sizeMap[size] || sizeMap.md;
+  return (
+    <div
+      aria-label="loading"
+      style={{
+        width: px,
+        height: px,
+        border: '3px solid #000',
+        borderTopColor: 'transparent',
+        borderRadius: '999px',
+        animation: 'spin 0.8s linear infinite',
+      }}
+    />
+  );
 };
 
 export default Loader;

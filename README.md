@@ -11,7 +11,8 @@ The following diagram illustrates the high-level flow of the Knowledge Twin syst
 ```mermaid
 graph TD
     User([User]) <--> Frontend[React Frontend - Vite]
-    Frontend <--> Backend[FastAPI Backend - Port 8003]
+    Frontend <--> Backend[Node.js / Express Backend - Port 8000]
+    Backend <--> Mongo[(MongoDB Atlas)]
     
     subgraph "Backend Processing"
         Backend --> Context[Context Manager]
@@ -55,7 +56,7 @@ Most AIs forget as soon as you stop asking. The Knowledge Twin is different:
 ### 4. **Industrial-Grade Stability (The Shield)** 🛡️⚙️
 Built for developers and professionals who need 100% uptime:
 - **Rate-Limit Auto-Recovery**: Implements a proprietary 10-second "Deep Backoff" logic. If Google's API is busy, the Twin waits and retries automatically.
-- **Ghost-Server Isolation**: Migrated to Port **8003** to prevent browser-stealing ghost processes.
+- **Ghost-Server Isolation**: Migrated to Port **8000** to prevent browser-stealing ghost processes.
 - **Model Rotation**: A resilient fallback chain (2.0 Flash → 1.5 Pro → 1.5 Flash-8b) ensures you always get an answer.
 
 ### 5. **Security & Privacy First** 🔐📁
@@ -78,19 +79,23 @@ The Knowledge Twin features a **Premium Glassmorphism Design System**:
 
 ```text
 KnowledgeTwin/
-├── backend/                # Python FastAPI Intelligence
-│   ├── main.py             # API Routing & Payload Handling
-│   ├── rag.py              # The Core RAG & Multimedia Logic
-│   ├── requirements.txt    # Python Dependencies
-│   └── .env                # API Key Storage (Private)
-├── frontend/               # React (Vite) User Experience
+├── backend/                 # Node.js / Express Intelligence
+│   ├── src/
+│   │   ├── server.js        # App entry, CORS, Mongo connect
+│   │   ├── config/db.js     # MongoDB (Mongoose) connection
+│   │   ├── models/          # Chunk, Media, FileMeta, ChatMessage, Stats
+│   │   ├── services/        # geminiService.js, ragService.js
+│   │   └── routes/          # upload, query, dashboard, files, clear
+│   ├── package.json         # Node Dependencies
+│   └── .env                 # API Key & Mongo URI Storage (Private)
+├── frontend/                # React (Vite) User Experience
 │   ├── src/
 │   │   ├── components/
-│   │   │   └── Chat.jsx    # Glassmorphic Chat Interface
-│   │   └── App.jsx         # Application Root
-│   └── tailwind.config.js  # Premium Styling Config
-├── .gitignore              # Global Security Mask
-└── README.md               # Extensive Documentation
+│   │   │   └── Chat.jsx     # Glassmorphic Chat Interface
+│   │   └── App.jsx          # Application Root
+│   └── tailwind.config.js   # Premium Styling Config
+├── .gitignore                # Global Security Mask
+└── README.md                 # Extensive Documentation
 ```
 
 ---
@@ -98,8 +103,8 @@ KnowledgeTwin/
 ## 🛠️ Installation & Setup
 
 ### **Prerequisites**
-- Python 3.10+
 - Node.js 18+
+- A MongoDB connection (e.g. a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster)
 - [Google Gemini API Key](https://aistudio.google.com/)
 
 ### **1. Backend Activation**
@@ -107,11 +112,11 @@ KnowledgeTwin/
 # Navigate to backend
 cd backend
 # Install dependencies
-pip install -r requirements.txt
-# Create .env and add your key
-echo "GEMINI_API_KEY=YOUR_KEY" > .env
-# Launch with Port Isolation
-python -m uvicorn main:app --host 0.0.0.0 --port 8003
+npm install
+# Create .env from the example and fill in your key + Mongo URI
+copy .env.example .env
+# Launch on port 8000
+npm run dev
 ```
 
 ### **2. Frontend Activation**
@@ -126,7 +131,7 @@ npm run dev
 
 ### **3. Synchronization**
 Ensure `Chat.jsx` points to:
-`const HOST = "http://localhost:8003";`
+`const HOST = "http://localhost:8000";`
 
 ---
 
@@ -134,3 +139,4 @@ Ensure `Chat.jsx` points to:
 The Knowledge Twin is designed to be your most reliable pair-programmer and researcher. If you encounter a "Busy Modules" message, simply wait 10 seconds—our **Deep Recovery** system is busy working for you!
 
 **Optimized for Excellence. Powered by Gemini 2.0. 🚀🤖🤝💖**
+

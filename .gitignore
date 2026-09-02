@@ -4,15 +4,9 @@
 .env.*.local
 *.log
 
-# Python
+# Node / Backend
 backend/.env
-backend/venv/
-backend/__pycache__/
-backend/*.pyc
-backend/temp_*
-backend/debug_rag.log
-backend/models_list.txt
-
+backend/node_modules/
 
 # Node / Frontend
 frontend/node_modules/
